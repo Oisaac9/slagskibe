@@ -1,3 +1,4 @@
+
 class GridCell extends Phaser.GameObjects.Sprite {
     constructor(config) {
          
@@ -63,3 +64,6 @@ class GridCell extends Phaser.GameObjects.Sprite {
         this.setFrame(this.config.up);
     }      
   }
+
+  module.exports = GridCell
+
