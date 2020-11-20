@@ -46,20 +46,34 @@ var playerBoard = new Phaser.Class({
       this.load.spritesheet('spaceship', 'images/spaceship.png', { frameWidth: 20, frameHeight: 20 });
       this.load.spritesheet('actions', 'images/actions.png', { frameWidth: 20, frameHeight: 20 });
       this.load.spritesheet('explosion', 'images/explosion.png', { frameWidth: 60, frameHeight: 60 });
+      this.load.image('map', 'images/map.png');
+
   },
 
   create: function  ()
   {
       this.socket = io('http://localhost:3000', { transport : ['websocket'] });
       this.socket.on('connect', function () {
-        console.log('Connected!');
+        console.log('Connected! (', this);
+      });  
+      this.socket.on('message', function (msg) {
+        console.log('message! ', msg);
+        if(msg == "Started") {
+            // Start the game
+        } else if(msg == "You are player A") {
+
+        } else if(msg == "You are player B") {
+
+        } else {
+            console.log("Unknown message:", msg);
+        }
       });
 
 
-      //this.add.image(400, 300, 'grid_bg');
-      this.cameras.main.backgroundColor = Phaser.Display.Color.HexStringToColor("#3498db");
+     this.add.image(400, 300, "map");
+     this.cameras.main.backgroundColor = Phaser.Display.Color.HexStringToColor("#3498db");
       // WHo is playing
-      this.add.text(100, 100, 'You are player '+gameStateData.activePlayer, { fill: '#0f0' });
+      this.add.text(550, 543, 'You are player '+gameStateData.activePlayer, { fill: '#0f0' });
 
 
       this.isFirstTurn = (gameStateData.getPlayer().shipLocation == null);

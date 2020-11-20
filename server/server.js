@@ -87,6 +87,21 @@ var http = require('http');
 const app = express();
 const server = http.createServer(app);
 
+var games = {};
+var nextGame = {
+    playerA:null,
+    playerB:null,
+    start:function() {
+        this.broadCast("Started");
+    },
+    broadCast:function(msg) {
+        this.playerA.send(msg);
+        if(this.playerB != null) {
+            this.playerB.send(msg);
+        }
+    }
+};
+
 const io = require("socket.io")(server,  {  
     cors: {    
         origin: "*",   
@@ -99,8 +114,32 @@ const io = require("socket.io")(server,  {
 io.on('connection', function (socket) {
     console.log('A user connected: ' + socket.id);
 
+    if(nextGame.playerA != null) {
+        socket.send("You are player B");
+        nextGame.playerB = socket;
+        socket.player = "B";
+        socket.game = nextGame;
+
+        // Start the game
+        nextGame.start();
+
+        // TODO: Create a new empty game
+        nextGame = null;
+    } else {
+        socket.send("You are player A");
+        nextGame.playerA = socket;
+        socket.player = "A";
+        socket.game = nextGame;
+    }
+
+
     socket.on('disconnect', function () {
         console.log('A user disconnected: ' + socket.id);
+    });
+
+    socket.on("message", function(msg) {
+        console.log('message:'+msg);
+        this.game.broadCast(msg);
     });
 });
 
