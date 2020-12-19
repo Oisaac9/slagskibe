@@ -59,14 +59,23 @@ var playerBoard = new Phaser.Class({
       });  
       this.socket.on('message', function (msg) {
         console.log('message! ', msg);
-        if(msg == "Started") {
-            // Start the game
-        } else if(msg == "You are player A") {
-            gameStateData.clientPlayer = "A";
-        } else if(msg == "You are player B") {
-            gameStateData.clientPlayer = "B";
-        } else {
-            console.log("Unknown message:", msg);
+        switch(msg.action) {
+            case "start":
+                this.send({action:"chat", message:"Hello, player "+gameStateData.clientPlayer+" is ready"});
+                break;
+            case "end":
+                console.log("TODO, Game ended, reason: "+msg.reason);
+                break;
+            case "assign":
+                gameStateData.clientPlayer = msg.player;
+                break;
+            case "chat":
+                console.log("CHAT: ", msg.message);
+                break;
+            default:
+                console.log("Unknown action: ", msg);
+                break;
+
         }
       });
 

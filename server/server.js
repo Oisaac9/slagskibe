@@ -94,11 +94,16 @@ function createGame(playerA) {
         playerA:playerA,
         playerB:null,
         start:function() {
-            this.broadCast("Started");
+            this.broadCast({action:"start"});
         },
-        broadCast:function(msg) {
-            this.playerA.send(msg);
-            if(this.playerB != null) {
+        end:function(reason) {
+            this.broadCast({action:'end',reason:reason});
+        },
+        broadCast:function(msg, sender) {
+            if(sender != this.playerA) {
+                this.playerA.send(msg);
+            }
+            if(this.playerB != null && sender != this.playerB) {
                 this.playerB.send(msg);
             }
         }
@@ -120,10 +125,10 @@ io.on('connection', function (socket) {
     console.log('A user connected: ' + socket.id);
 
     if(nextGame != null) {
-        socket.send("You are player B");
         nextGame.playerB = socket;
         socket.player = "B";
         socket.game = nextGame;
+        socket.send({action:"assign", player:"B"});
 
         // Start the game
         nextGame.start();
@@ -131,9 +136,9 @@ io.on('connection', function (socket) {
         nextGame = null;
     } else {
         nextGame = createGame(socket);
-        socket.send("You are player A");
         socket.player = "A";
         socket.game = nextGame;
+        socket.send({action:"assign", player:"A"});
     }
 
 
@@ -144,7 +149,7 @@ io.on('connection', function (socket) {
 
     socket.on("message", function(msg) {
         console.log('message:'+msg);
-        this.game.broadCast(msg);
+        this.game.broadCast(msg, this);
     });
 });
 
