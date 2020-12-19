@@ -5,6 +5,7 @@ import io from 'socket.io-client';
 //import logoImg from "./assets/logo.png";
 
 var gameStateData = {
+    clientPlayer:null,
   activePlayer: "A",
   switchPlayer:function() {
       if(this.activePlayer == "A") {
@@ -61,9 +62,9 @@ var playerBoard = new Phaser.Class({
         if(msg == "Started") {
             // Start the game
         } else if(msg == "You are player A") {
-
+            gameStateData.clientPlayer = "A";
         } else if(msg == "You are player B") {
-
+            gameStateData.clientPlayer = "B";
         } else {
             console.log("Unknown message:", msg);
         }
@@ -186,6 +187,7 @@ var playerBoard = new Phaser.Class({
   }
 });
 
+// TODO: Make an invisible scene which keeps the gameStateData and connnection to server.
 
 var switchBoard = new Phaser.Class({
 

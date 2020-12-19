@@ -87,20 +87,23 @@ var http = require('http');
 const app = express();
 const server = http.createServer(app);
 
-var games = {};
-var nextGame = {
-    playerA:null,
-    playerB:null,
-    start:function() {
-        this.broadCast("Started");
-    },
-    broadCast:function(msg) {
-        this.playerA.send(msg);
-        if(this.playerB != null) {
-            this.playerB.send(msg);
+var games = [];
+var nextGame = null;
+function createGame(playerA) {
+    return {
+        playerA:playerA,
+        playerB:null,
+        start:function() {
+            this.broadCast("Started");
+        },
+        broadCast:function(msg) {
+            this.playerA.send(msg);
+            if(this.playerB != null) {
+                this.playerB.send(msg);
+            }
         }
-    }
-};
+    };
+}
 
 const io = require("socket.io")(server,  {  
     cors: {    
@@ -111,10 +114,12 @@ const io = require("socket.io")(server,  {
     }
 });
 
+
+
 io.on('connection', function (socket) {
     console.log('A user connected: ' + socket.id);
 
-    if(nextGame.playerA != null) {
+    if(nextGame != null) {
         socket.send("You are player B");
         nextGame.playerB = socket;
         socket.player = "B";
@@ -122,12 +127,11 @@ io.on('connection', function (socket) {
 
         // Start the game
         nextGame.start();
-
-        // TODO: Create a new empty game
+        games.push(nextGame);
         nextGame = null;
     } else {
+        nextGame = createGame(socket);
         socket.send("You are player A");
-        nextGame.playerA = socket;
         socket.player = "A";
         socket.game = nextGame;
     }
@@ -135,6 +139,7 @@ io.on('connection', function (socket) {
 
     socket.on('disconnect', function () {
         console.log('A user disconnected: ' + socket.id);
+        this.game.end("The game ended because player "+this.player+" disconnected");
     });
 
     socket.on("message", function(msg) {
