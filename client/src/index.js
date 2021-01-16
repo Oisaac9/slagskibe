@@ -5,29 +5,105 @@ import io from 'socket.io-client';
 //import logoImg from "./assets/logo.png";
 
 var gameStateData = {
+    socket: null,
+    playerBoard: null,
+    switchBoard: null,
     clientPlayer:null,
-  activePlayer: "A",
-  switchPlayer:function() {
-      if(this.activePlayer == "A") {
-          this.activePlayer = "B";
-      } else {
-          this.activePlayer = "A";
-      }
-  },
-  playerA: {
+    activePlayer: "A",
+    getOpponentPlayer:function() {
+        if(this.clientPlayer === "A") {
+            return "B";
+        } else {
+            return "A";
+        }
+    },
+    switchPlayer:function() {
+        if (this.activePlayer === "A") {
+            this.activePlayer = "B";
+        } else {
+            this.activePlayer = "A";
+        }
+        console.log("activePlayer: " + this.activePlayer);
+        this.activeCorrectScene();
+    },
+    activeCorrectScene:function() {
+        if(this.activePlayer === this.clientPlayer) {
+            //gameStateData.switchPlayer();
+            this.switchBoard.statusText.setText('It is your turn... make your move');
+            //this.scene.launch('playerBoard');
+            //game.scene.stop('switchBoard');
+            //this.switchBoard = null;
+            this.switchBoard.scene.switch('playerBoard');
+            if(this.playerBoard !== null) {
+                this.playerBoard.updateView();
+            }
+        } else {
+            this.switchBoard.statusText.setText('Waiting for player '+this.getOpponentPlayer());
+            //this.scene.remove('playerBoard');
+            //game.scene.stop('playerBoard');
+            //this.playerBoard = null;
+            if(this.playerBoard !== null) {
+                this.playerBoard.scene.switch('switchBoard');
+            }
+        }
+    },
+    player: {
       shipLocation: null,
       explosionLocation: null,
-  },
-  playerB: {
+      bombLocation:null,
+      hitpoints: 5,
+    },
+    playerOther: {
       shipLocation: null,
       explosionLocation: null,
-  },
-  getPlayer:function() {
-      return this.activePlayer == 'A' ? this.playerA : this.playerB;
-  },
-  getOtherPlayer:function() {
-      return this.activePlayer == 'A' ? this.playerB : this.playerA;
-  }
+      bombLocation:null,
+      hitpoints: 5,
+    },
+    getPlayer:function() {
+      return this.player;
+    },
+    getOtherPlayer:function() {
+      return this.playerOther;
+    },
+    initConnection:function() {
+        if(this.socket === null) {
+            console.log("Connecting...");
+            this.socket = io('http://localhost:3000', { transport : ['websocket'] });
+            this.socket.on('connect', function () {
+                console.log('Connected! (', this);
+            });
+            this.socket.on('message', function (msg) {
+                console.log('message! ', msg);
+                switch(msg.action) {
+                    case "start":
+                        this.send({action:"chat", message:"Hello, player "+gameStateData.clientPlayer+" is ready"});
+                        gameStateData.activeCorrectScene();
+                        break;
+                    case "end":
+                        console.log("TODO, Game ended, reason: "+msg.reason);
+                        break;
+                    case "assign":
+                        gameStateData.clientPlayer = msg.player;
+                        console.log(gameStateData);
+                        gameStateData.switchBoard.statusText.setText('You are player '+gameStateData.clientPlayer);
+                        break;
+                    case "update":
+                        //gameStateData.clientPlayer = msg.gameStateData.clientPlayer;
+                        gameStateData.playerOther = msg.player;
+                        gameStateData.player.explosionLocation = gameStateData.playerOther.bombLocation;
+                        gameStateData.switchPlayer();
+                        break;
+                    case "chat":
+                        console.log("CHAT: ", msg.message);
+                        break;
+                    default:
+                        console.log("Unknown action: ", msg);
+                        break;
+
+                }
+            });
+        }
+    }
 };
 
 var playerBoard = new Phaser.Class({
@@ -51,43 +127,31 @@ var playerBoard = new Phaser.Class({
 
   },
 
-  create: function  ()
-  {
-      this.socket = io('http://localhost:3000', { transport : ['websocket'] });
-      this.socket.on('connect', function () {
-        console.log('Connected! (', this);
-      });  
-      this.socket.on('message', function (msg) {
-        console.log('message! ', msg);
-        switch(msg.action) {
-            case "start":
-                this.send({action:"chat", message:"Hello, player "+gameStateData.clientPlayer+" is ready"});
-                break;
-            case "end":
-                console.log("TODO, Game ended, reason: "+msg.reason);
-                break;
-            case "assign":
-                gameStateData.clientPlayer = msg.player;
-                break;
-            case "chat":
-                console.log("CHAT: ", msg.message);
-                break;
-            default:
-                console.log("Unknown action: ", msg);
-                break;
+  create: function() {
+      gameStateData.playerBoard = this;
 
-        }
-      });
-
-
-     this.add.image(400, 300, "map");
-     this.cameras.main.backgroundColor = Phaser.Display.Color.HexStringToColor("#3498db");
+      this.add.image(400, 300, "map");
+      this.cameras.main.backgroundColor = Phaser.Display.Color.HexStringToColor("#3498db");
       // WHo is playing
-      this.add.text(550, 543, 'You are player '+gameStateData.activePlayer, { fill: '#0f0' });
+      this.youArePlayer = this.add.text(550, 543, '', {fill: '#0f0'});
+      this.youArePlayer.setText('You are player ' + gameStateData.clientPlayer + "\nHitpoints: "+gameStateData.getPlayer().hitpoints);
 
 
+      this.actionText = this.add.text(100, 120, '...', { fill: '#0f0' });
+      // Add the switch button (hidden)
+      this.switchButton = this.add.text(200, 500, 'I am done', { fill: '#0f0' });
+      this.switchButton.setInteractive();
+      this.switchButton.on('pointerdown', () => { this.clickSwitchButton(); });
+      this.switchButton.visible = false;
+      this.spaceship = this.add.sprite(0, 0, 'spaceship');
+      this.actions = this.add.sprite(0, 0, 'actions');
+      this.explosion = this.add.image(0,0,'explosion');
+      this.explosion.visible = false;
+
+      this.updateView();
+  },
+  updateView: function() {
       this.isFirstTurn = (gameStateData.getPlayer().shipLocation == null);
-
 
       this.yStart = 150;
       this.xStart = 250;
@@ -107,60 +171,68 @@ var playerBoard = new Phaser.Class({
           }
       }
 
-      this.spaceship = this.add.sprite(0, 0, 'spaceship');
-      this.actions = this.add.sprite(0, 0, 'actions');
       this.actions.visible = false;
 
 
 
       if(this.isFirstTurn) {
-          this.add.text(100, 120, 'Place your ship', { fill: '#0f0' });
+          this.actionText.setText('Place your ship');
           // Place your ship
           this.spaceship.visible = false;
       } else {
-          this.add.text(100, 120, 'Shoot or move', { fill: '#0f0' });
+          this.actionText.setText('Shoot or move');
           // Show the ship - let the player choose to bomb a square
           this.moveToCell(this.spaceship, gameStateData.getPlayer().shipLocation);
 
           if(gameStateData.getPlayer().explosionLocation != null) {
-              let explosion = this.add.image(0,0,'explosion');
-              this.moveToCell(explosion, gameStateData.getPlayer().explosionLocation);
+              this.explosion.visible = true;
+              this.moveToCell(this.explosion, gameStateData.getPlayer().explosionLocation);
 
               // TODO: Deal damage
+              let sl = gameStateData.getPlayer().shipLocation;
+              let el = gameStateData.getPlayer().explosionLocation;
+              let dx = Math.abs(sl.x - el.x);
+              let dy = Math.abs(sl.y - el.y);
+              if(dx <= 0 && dy <= 0) {
+                  gameStateData.getPlayer().hitpoints -= 2;
+              } else if(dx <= 1 && dy <= 1) {
+                  gameStateData.getPlayer().hitpoints -= 1;
+              } else if(dx <= 2 && dy <= 2) {
+                  //gameStateData.getPlayer().hitpoints -= 1;
+              }
+
+              this.youArePlayer.setText('You are player ' + gameStateData.clientPlayer + "\nHitpoints: "+gameStateData.getPlayer().hitpoints);
+
+              if(gameStateData.getPlayer().hitpoints <= 0) {
+                  this.youArePlayer.setText("U ded!");
+                  // TODO: End the game
+              }
 
               gameStateData.getPlayer().explosionLocation = null;
+          } else {
+              this.explosion.visible = false;
           }
       }
-
-      // Add the switch button (hidden)
-      let clickCount = 0;
-      this.switchButton = this.add.text(200, 500, 'I am done', { fill: '#0f0' });
-      this.switchButton.setInteractive();
-      this.switchButton.on('pointerdown', () => { this.clickSwitchButton(++clickCount); });
-      this.switchButton.visible = false;
   },
   moveToCell(obj, dest) {
       obj.x = this.xStart + dest.x * 20;
       obj.y = this.yStart + dest.y * 20;
   },
 
-  clickSwitchButton(clickCount) {
-      this.switchButton.setText(`Button has been clicked ${clickCount} times.`);
-      if(clickCount > 1) {
-          if(this.isFirstTurn) {
-              // Do nothing
-          } else {
-              if(this.actions.action == "shoot") {
-                  // TODO: Shoot the other player
-                  gameStateData.getOtherPlayer().explosionLocation = this.actions.cellId;
-              } else {
-                  // Move
-                  gameStateData.getPlayer().shipLocation = this.actions.cellId;
-              }
-          }
-
-          this.scene.start('switchBoard');
+  clickSwitchButton() {
+    if(this.isFirstTurn) {
+      // Do nothing
+    } else {
+      if(this.actions.action === "shoot") {
+          gameStateData.getPlayer().bombLocation = this.actions.cellId;
+      } else {
+          // Move
+          gameStateData.getPlayer().shipLocation = this.actions.cellId;
       }
+    }
+    gameStateData.switchPlayer();
+    gameStateData.socket.send({'action':'update', 'player':gameStateData.getPlayer()});
+    gameStateData.getPlayer().bombLocation = null;
   },
   clickGridCell(gridCell) {
       console.log(gridCell.cellId);
@@ -198,7 +270,7 @@ var playerBoard = new Phaser.Class({
 
 // TODO: Make an invisible scene which keeps the gameStateData and connnection to server.
 
-var switchBoard = new Phaser.Class({
+let switchBoard = new Phaser.Class({
 
   Extends: Phaser.Scene,
 
@@ -217,19 +289,20 @@ var switchBoard = new Phaser.Class({
 
   create: function ()
   {
+      gameStateData.switchBoard = this;
+      console.log("Assigned switchBoard");
+
       this.add.image(400, 300, 'switch_bg');
 
-      let clickCount = 0;
-      this.switchButton = this.add.text(200, 500, 'I am done', { fill: '#0f0' });
-      this.switchButton.setInteractive();
-      this.switchButton.on('pointerdown', () => { this.clickSwitchButton(++clickCount); });
-  },
-  clickSwitchButton(clickCount) {
-      this.switchButton.setText(`Button has been clicked ${clickCount} times.`);
-      if(clickCount > 1) {
-          gameStateData.switchPlayer();
-          this.scene.start('playerBoard');
-      }
+
+      // WHo is playing
+      this.statusText = this.add.text(550, 543, 'Connecting...', { fill: '#0f0' });
+
+      //let clickCount = 0;
+      //this.switchButton = this.add.text(200, 500, 'I am done', { fill: '#0f0' });
+      //this.switchButton.setInteractive();
+      //this.switchButton.on('pointerdown', () => { this.clickSwitchButton(++clickCount); });
+      gameStateData.initConnection();
   },
 
   update: function() {
@@ -239,7 +312,7 @@ var switchBoard = new Phaser.Class({
 });
 
 
-var config = {
+let config = {
   type: Phaser.WEBGL,
   width: 800,
   height: 600,
@@ -249,7 +322,7 @@ var config = {
           gravity: { y: 200 }
       }
   },
-  scene: [playerBoard, switchBoard]
+  scene: [switchBoard, playerBoard]
 };
 
 const game = new Phaser.Game(config);
