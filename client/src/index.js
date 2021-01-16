@@ -233,7 +233,7 @@ var switchBoard = new Phaser.Class({
   },
 
   update: function() {
-      console.log('switching');
+      //console.log('switching');
   }
 
 });
