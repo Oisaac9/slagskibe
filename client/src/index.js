@@ -68,7 +68,7 @@ var gameStateData = {
     initConnection:function() {
         if(this.socket === null) {
             console.log("Connecting...");
-            this.socket = io('http://localhost:3000', { transport : ['websocket'] });
+            this.socket = io('http://127.0.0.1:3000', { transport : ['websocket'] });
             this.socket.on('connect', function () {
                 console.log('Connected! (', this);
             });
@@ -124,6 +124,12 @@ var playerBoard = new Phaser.Class({
       this.load.spritesheet('actions', 'images/actions.png', { frameWidth: 20, frameHeight: 20 });
       this.load.spritesheet('explosion', 'images/explosion.png', { frameWidth: 60, frameHeight: 60 });
       this.load.image('map', 'images/map.png');
+      this.load.image('vitory_image', 'images/victory-1.jpg');
+      this.load.audio('song','audio/BoxCat Games - Battle (Special).mp3')
+      this.load.audio('lose effect','audio/61233899.mp3')
+      this.load.audio('song_victory','audio/Ultimate-Victory-WST010901.mp3')
+      this.load.audio('victory effect','audio/victory sound.mp3')
+
 
   },
 
@@ -131,6 +137,9 @@ var playerBoard = new Phaser.Class({
       gameStateData.playerBoard = this;
 
       this.add.image(400, 300, "map");
+      this.music = this.sound.add('song');
+      this.music_victory = this.sound.add('song_victory');
+      this.music.play();
       this.cameras.main.backgroundColor = Phaser.Display.Color.HexStringToColor("#3498db");
       // WHo is playing
       this.youArePlayer = this.add.text(550, 543, '', {fill: '#0f0'});
@@ -205,7 +214,19 @@ var playerBoard = new Phaser.Class({
 
               if(gameStateData.getPlayer().hitpoints <= 0) {
                   this.youArePlayer.setText("U ded!");
+                  this.music.stop();
+                  var ded = this.sound.add('lose effect');
+                  ded.play();
+
+
                   // TODO: End the game
+              } else if(gameStateData.getOtherPlayer().hitpoints <= 0) {
+                this.music.stop();
+                this.music_victory.play();
+                this.add.image(400, 300, "victory_image");
+                var win = this.sound.add('victory effect');
+                win.play();
+
               }
 
               gameStateData.getPlayer().explosionLocation = null;
@@ -231,6 +252,7 @@ var playerBoard = new Phaser.Class({
       }
     }
     gameStateData.switchPlayer();
+    console.log("sending",gameStateData.getPlayer());
     gameStateData.socket.send({'action':'update', 'player':gameStateData.getPlayer()});
     gameStateData.getPlayer().bombLocation = null;
   },
